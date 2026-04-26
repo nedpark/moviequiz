@@ -76,6 +76,11 @@
 
 퀴즈 문제는 매 세트마다 섞이도록(Shuffle) 구현해줘.
 
+에셋 최적화 및 프리로딩:
+- 게임 시작 시 필수 이미지 및 첫 스테이지 영상을 미리 로드(Preload)하여 로딩 지연을 최소화해.
+- 각 스테이지 진행 중에 다음 스테이지에 필요한 에셋을 백그라운드에서 미리 로드해.
+- 에셋이 로드되는 동안 사용자에게 진행 상황을 알리는 로딩 화면을 제공해.
+
 [Technical Constraints: Pure Vanilla JS]
 
 No Frameworks/Libraries: React, Vue, jQuery, Tailwind CSS 등 어떠한 외부 프레임워크나 라이브러리도 사용하지 마. 오직 HTML5, CSS3, ES6+ JavaScript만 사용해.

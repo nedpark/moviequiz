@@ -1,3 +1,45 @@
+// ====== 에셋 관리 (프리로딩) ======
+const AssetManager = {
+    images: {},
+    videos: {},
+    
+    async preloadImage(path) {
+        if (this.images[path]) return;
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.src = path;
+            img.onload = () => {
+                this.images[path] = true;
+                resolve();
+            };
+            img.onerror = reject;
+        });
+    },
+    
+    async preloadVideo(path) {
+        if (this.videos[path]) return;
+        try {
+            const response = await fetch(path);
+            const blob = await response.blob();
+            this.videos[path] = URL.createObjectURL(blob);
+        } catch (err) {
+            console.warn(`비디오 프리로딩 실패 (${path}):`, err);
+        }
+    },
+
+    // 다음 스테이지 에셋 미리 로드
+    preloadNextStage(stageNum) {
+        if (stageNum < 4) {
+            this.preloadImage(`./assets/Stage${String(stageNum + 1).padStart(2, '0')}.png`);
+            this.preloadVideo(`./assets/Stage${String(stageNum + 1).padStart(2, '0')}In.mp4`);
+        }
+        if (stageNum === 4) {
+            this.preloadImage('./assets/StageFinal.png');
+            this.preloadVideo('./assets/StageFinalIn.mp4');
+        }
+    }
+};
+
 // ====== 배경음악 관리 ======
 const MusicManager = {
     currentMusic: null, // 현재 재생 중인 음악
@@ -207,6 +249,9 @@ function renderQuizScreen(stageNum) {
     GameState.startTimer(stageNum, () => {
         checkAnswer(stageNum, null, null);
     });
+
+    // 다음 스테이지 에셋 프리로드
+    AssetManager.preloadNextStage(stageNum);
 }
 
 function renderFinalScreen() {
@@ -348,10 +393,13 @@ function playVideoAndTransition(stageNum, type) {
         videoPath = './assets/StageFinalIn.mp4';
     }
     
+    // 프리로드된 비디오 URL이 있으면 사용
+    const finalVideoPath = AssetManager.videos[videoPath] || videoPath;
+    
     app.innerHTML = `
         <div class="video-container">
             <video autoplay muted playsinline>
-                <source src="${videoPath}" type="video/mp4">
+                <source src="${finalVideoPath}" type="video/mp4">
             </video>
         </div>
     `;
@@ -378,21 +426,45 @@ function playVideoAndTransition(stageNum, type) {
 
 // ====== 초기화 ======
 async function initGame() {
+    const app = document.getElementById('app');
+    app.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: #fff;">
+            <div class="loader"></div>
+            <p style="margin-top: 20px;" id="loadingText">데이터를 불러오는 중...</p>
+        </div>
+    `;
+
     try {
         const response = await fetch('./quizdata_example.json');
         if (!response.ok) throw new Error('데이터 로드 실패');
         
         GameState.quizData = await response.json();
         GameState.reset();
+
+        // 필수 초기 에셋 프리로딩
+        const initialAssets = [
+            './assets/StageStart.png',
+            './assets/Stage01.png',
+            './assets/Stage01In.mp4'
+        ];
+
+        const loadingText = document.getElementById('loadingText');
+        for (let i = 0; i < initialAssets.length; i++) {
+            loadingText.innerText = `에셋 최적화 중... (${i + 1}/${initialAssets.length})`;
+            if (initialAssets[i].endsWith('.png')) {
+                await AssetManager.preloadImage(initialAssets[i]);
+            } else {
+                await AssetManager.preloadVideo(initialAssets[i]);
+            }
+        }
+        
         renderStartScreen();
     } catch (error) {
         console.error('초기화 오류:', error);
-        const app = document.getElementById('app');
         app.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: #fff; text-align: center;">
-                <h2>오류가 발생했습니다</h2>
+                <h2>오류 발생</h2>
                 <p>${error.message}</p>
-                <p>quizdata_example.json 파일이 프로젝트 루트에 있는지 확인하세요.</p>
                 <button class="btn" onclick="location.reload()">새로고침</button>
             </div>
         `;
