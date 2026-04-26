@@ -146,6 +146,21 @@ body {
     box-shadow: 0 0 10px rgba(244, 67, 54, 0.8);
 }
 
+/* 진행 정보 */
+.progress-info {
+    position: absolute;
+    top: 95px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 18px;
+    font-weight: bold;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 8px 16px;
+    border-radius: 20px;
+    z-index: 20;
+}
+
 /* 퀴즈 콘텐츠 */
 .quiz-content {
     flex: 1;
@@ -154,7 +169,7 @@ body {
     align-items: center;
     justify-content: center;
     gap: 40px;
-    padding: 80px 40px 40px;
+    padding: 140px 40px 40px;
     z-index: 5;
 }
 

@@ -42,63 +42,46 @@ const MusicManager = {
 const GameState = {
     quizData: null,
     currentStage: 0, // 0 = 시작 화면, 1-4 = 각 스테이지
-    remainingQuestions: [], // 남은 문제 인덱스 배열
-    currentQuestionSet: [], // 현재 5개 문제
-    correctCount: 0, // 연속 정답 수 (0-5)
-    mistakesCount: 0, // 실수 횟수 (0-3)
-    usedQuestionIndices: [], // 사용한 문제의 원본 인덱스
+    questionsForStage: [], // 이 스테이지의 5개 문제 인덱스
+    questionIndex: 0, // 현재 제시하는 문제 인덱스 (0-4)
+    correctCount: 0, // 맞춘 개수 (0-3, 3이면 클리어)
+    wrongCount: 0, // 틀린 개수 (0-3, 3이면 탈락)
     correctAnswers: 0, // 맞춘 총 문제 수
     wrongAnswers: 0, // 틀린 총 문제 수
     
     reset() {
         this.currentStage = 0;
-        this.remainingQuestions = [];
-        this.currentQuestionSet = [];
+        this.questionsForStage = [];
+        this.questionIndex = 0;
         this.correctCount = 0;
-        this.mistakesCount = 0;
-        this.usedQuestionIndices = [];
+        this.wrongCount = 0;
         this.correctAnswers = 0;
         this.wrongAnswers = 0;
     },
     
     startStage(stageNum) {
         this.currentStage = stageNum;
+        this.questionIndex = 0;
         this.correctCount = 0;
-        this.mistakesCount = 0;
+        this.wrongCount = 0;
         this.correctAnswers = 0;
         this.wrongAnswers = 0;
-        this.usedQuestionIndices = [];
-        // 현재 스테이지의 모든 문제 인덱스 생성 (0-19)
-        this.remainingQuestions = Array.from({ length: 20 }, (_, i) => i);
-        this.drawQuestionSet();
+        
+        // 현재 스테이지의 20개 문제 중에서 5개를 무작위로 선택
+        const allQuestions = Array.from({ length: 20 }, (_, i) => i);
+        const shuffled = allQuestions.sort(() => Math.random() - 0.5);
+        this.questionsForStage = shuffled.slice(0, 5);
     },
     
-    drawQuestionSet() {
-        // 남은 문제 중 5개를 무작위로 추출
-        const shuffled = this.remainingQuestions.sort(() => Math.random() - 0.5);
-        this.currentQuestionSet = shuffled.slice(0, 5);
-        // 추출한 문제를 남은 문제 목록에서 제거
-        this.remainingQuestions = this.remainingQuestions.filter(
-            idx => !this.currentQuestionSet.includes(idx)
-        );
+    getCurrentQuestion() {
+        if (this.questionIndex < this.questionsForStage.length) {
+            return this.questionsForStage[this.questionIndex];
+        }
+        return null;
     },
     
-    addUsedQuestions() {
-        const stageData = this.quizData.movie_quiz_app.stages[this.currentStage - 1];
-        this.currentQuestionSet.forEach(idx => {
-            const questionId = stageData.questions[idx].id;
-            if (!this.usedQuestionIndices.includes(questionId)) {
-                this.usedQuestionIndices.push(questionId);
-            }
-        });
-    },
-    
-    getRemainingCount() {
-        return this.remainingQuestions.length;
-    },
-    
-    getTotalUsed() {
-        return this.usedQuestionIndices.length;
+    moveToNextQuestion() {
+        this.questionIndex++;
     }
 };
 
@@ -122,21 +105,24 @@ function renderStartScreen() {
     });
 }
 
-function renderQuizScreen(stageNum, questions) {
+function renderQuizScreen(stageNum) {
     const app = document.getElementById('app');
     const stageData = GameState.quizData.movie_quiz_app.stages[stageNum - 1];
-    const currentQuestion = questions[0];
-    const questionData = stageData.questions[currentQuestion];
+    const currentQuestionIndex = GameState.getCurrentQuestion();
+    const questionData = stageData.questions[currentQuestionIndex];
     
-    // 정답 원 (5개): 연속 정답 시 녹색으로 채워짐
-    const correctCircles = Array.from({ length: 5 }, (_, i) => `
+    // 정답 원 (3개): 맞춘 개수만큼 녹색으로 채워짐
+    const correctCircles = Array.from({ length: 3 }, (_, i) => `
         <div class="circle ${i < GameState.correctCount ? 'active correct-circle' : ''}"></div>
     `).join('');
     
-    // 실수 원 (3개): 실수할 때마다 빨간색으로 채워짐
-    const mistakeCircles = Array.from({ length: 3 }, (_, i) => `
-        <div class="circle ${i < GameState.mistakesCount ? 'active mistake-circle' : ''}"></div>
+    // 오답 원 (3개): 틀린 개수만큼 빨간색으로 채워짐
+    const wrongCircles = Array.from({ length: 3 }, (_, i) => `
+        <div class="circle ${i < GameState.wrongCount ? 'active mistake-circle' : ''}"></div>
     `).join('');
+    
+    // 진행 상황 (예: 문제 2/5)
+    const progressText = `문제 ${GameState.questionIndex + 1}/5`;
     
     app.innerHTML = `
         <img src="./assets/Stage${String(stageNum).padStart(2, '0')}.png" class="screen-background" alt="Stage ${stageNum}">
@@ -144,8 +130,9 @@ function renderQuizScreen(stageNum, questions) {
             <div class="status-bar">
                 <div class="status-left">Stage ${stageNum}/4</div>
                 <div class="status-center circles-container">${correctCircles}</div>
-                <div class="status-right circles-container">${mistakeCircles}</div>
+                <div class="status-right circles-container">${wrongCircles}</div>
             </div>
+            <div class="progress-info">${progressText}</div>
             <div class="quiz-content">
                 <div class="question-box">
                     <div class="question-text">${questionData.question}</div>
@@ -166,7 +153,7 @@ function renderQuizScreen(stageNum, questions) {
     
     // 옵션 버튼 이벤트 리스너
     document.querySelectorAll('.option-button').forEach(btn => {
-        btn.addEventListener('click', () => checkAnswer(stageNum, questions, btn.dataset.option, btn));
+        btn.addEventListener('click', () => checkAnswer(stageNum, btn.dataset.option, btn));
     });
 }
 
@@ -213,10 +200,10 @@ function renderGameOverScreen() {
 }
 
 // ====== 게임 로직 ======
-function checkAnswer(stageNum, questions, selectedAnswer, buttonElement) {
+function checkAnswer(stageNum, selectedAnswer, buttonElement) {
     const stageData = GameState.quizData.movie_quiz_app.stages[stageNum - 1];
-    const currentQuestion = questions[0];
-    const questionData = stageData.questions[currentQuestion];
+    const currentQuestionIndex = GameState.getCurrentQuestion();
+    const questionData = stageData.questions[currentQuestionIndex];
     const isCorrect = selectedAnswer === questionData.answer;
     
     // 모든 버튼 비활성화
@@ -230,9 +217,8 @@ function checkAnswer(stageNum, questions, selectedAnswer, buttonElement) {
         
         // 0.8초 후 다음 문제 또는 결과
         setTimeout(() => {
-            if (GameState.correctCount === 5) {
-                // 5연속 정답 성공! 스테이지 클리어
-                GameState.addUsedQuestions();
+            if (GameState.correctCount === 3) {
+                // 3개 정답 성공! 스테이지 클리어
                 setTimeout(() => {
                     if (stageNum === 4) {
                         // 최종 스테이지 클리어
@@ -243,17 +229,16 @@ function checkAnswer(stageNum, questions, selectedAnswer, buttonElement) {
                     }
                 }, 500);
             } else {
-                // 아직 5연속이 아님, 다음 문제로
-                questions.shift();
-                setTimeout(() => renderQuizScreen(stageNum, questions), 500);
+                // 아직 3개가 아님, 다음 문제로
+                GameState.moveToNextQuestion();
+                setTimeout(() => renderQuizScreen(stageNum), 500);
             }
         }, 800);
     } else {
         // 오답 표시
         buttonElement.classList.add('wrong');
         GameState.wrongAnswers++;
-        GameState.mistakesCount++;
-        GameState.correctCount = 0; // 연속 정답 초기화
+        GameState.wrongCount++;
         
         // 다른 버튼들 dim 처리
         document.querySelectorAll('.option-button').forEach(btn => {
@@ -271,15 +256,15 @@ function checkAnswer(stageNum, questions, selectedAnswer, buttonElement) {
         
         // 1.5초 후 처리
         setTimeout(() => {
-            if (GameState.mistakesCount >= 3) {
-                // 3번 실수 - 탈락
+            if (GameState.wrongCount >= 3) {
+                // 3개 오답 - 탈락
                 setTimeout(() => {
                     playVideoAndTransition(stageNum, 'stageOut');
                 }, 500);
             } else {
                 // 다시 도전
-                GameState.drawQuestionSet();
-                renderQuizScreen(stageNum, GameState.currentQuestionSet);
+                GameState.moveToNextQuestion();
+                renderQuizScreen(stageNum);
             }
         }, 1500);
     }
@@ -320,8 +305,7 @@ function playVideoAndTransition(stageNum, type) {
     video.onended = () => {
         if (type === 'stageIntro') {
             GameState.startStage(stageNum);
-            GameState.drawQuestionSet();
-            renderQuizScreen(stageNum, GameState.currentQuestionSet);
+            renderQuizScreen(stageNum);
         } else if (type === 'stageOut') {
             renderGameOverScreen();
         } else if (type === 'stageFinal') {
