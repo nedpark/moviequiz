@@ -44,6 +44,12 @@
 
 영상 제어: 모든 .mp4 영상은 재생이 끝나면 자동으로 다음 상태(퀴즈 화면 또는 결과 화면)로 넘어가야 해.
 
+배경음악: 각 스테이지와 결과 화면에서 적절한 .mp3 배경음악이 루프 재생되어야 해.
+- 스테이지 1-4: Stage01.mp3 ~ Stage04.mp3
+- 탈락 화면: StrageEnd.mp3
+- 최종통과 화면: StrageFinal.mp3
+- 비디오 재생 중: 배경음악 중지
+
 스테이터스 바: 
 - 상단 좌측: 현재 스테이지(Stage 1/4)
 - 상단 중앙: 5개의 원 → 정답 시 녹색으로 하나씩 채워짐 → 5개 다 채워지면 스테이지 클리어
@@ -124,6 +130,21 @@ movie_quiz/
 - [x] 한 문제 오답 시 연속 정답 초기화 → 새로운 5문제 세트 도전
 - [x] 3번 실수 시 스테이지 탈락
 
+### ✅ 배경음악 관리 (MusicManager 객체)
+```javascript
+MusicManager = {
+    currentMusic,           // 현재 재생 중인 음악
+    playMusic(stageNum, type), // 음악 재생 (type: 'quiz', 'gameOver', 'final')
+    stopMusic()            // 음악 중지
+}
+```
+- [x] 각 스테이지별 배경음악 자동 재생 (Stage01.mp3 ~ Stage04.mp3)
+- [x] 탈락 화면 배경음악 (StrageEnd.mp3)
+- [x] 최종통과 화면 배경음악 (StrageFinal.mp3)
+- [x] 배경음악 루프 재생 (loop = true)
+- [x] 비디오 재생 시 배경음악 자동 중지
+- [x] 음악 볼륨 50% 설정
+
 ### ✅ 상태 관리 (GameState 객체)
 ```javascript
 GameState = {
@@ -164,12 +185,14 @@ GameState = {
 | 함수 | 설명 |
 |------|------|
 | `initGame()` | 데이터 로드 및 게임 초기화 |
-| `renderStartScreen()` | 시작 화면 렌더링 |
-| `renderQuizScreen()` | 퀴즈 화면 렌더링 (5개 정답 원 + 3개 실수 원 표시) |
+| `renderStartScreen()` | 시작 화면 렌더링 (배경음악 중지) |
+| `renderQuizScreen()` | 퀴즈 화면 렌더링 + 스테이지 배경음악 재생 |
 | `checkAnswer()` | 정답 검증 및 게임 로직 처리 (연속 정답/실수 카운팅) |
-| `playVideoAndTransition()` | 비디오 재생 및 화면 전환 |
-| `renderGameOverScreen()` | 탈락 화면 렌더링 |
-| `renderFinalScreen()` | 최종 클리어 화면 렌더링 |
+| `playVideoAndTransition()` | 비디오 재생 및 화면 전환 (배경음악 중지) |
+| `renderGameOverScreen()` | 탈락 화면 렌더링 + 탈락 배경음악 재생 |
+| `renderFinalScreen()` | 최종 클리어 화면 렌더링 + 최종통과 배경음악 재생 |
+| `MusicManager.playMusic()` | 배경음악 재생 (stageNum, type 기반) |
+| `MusicManager.stopMusic()` | 현재 재생 중인 배경음악 중지 |
 
 ## 기술 스택
 
@@ -196,6 +219,10 @@ http://localhost:8000
 
 - ✅ 스테이터스 바에 5개 정답 원(녹색) + 3개 실수 원(빨간색) 표시
 - ✅ 탈락 화면 배경을 StageEnd.png로 통합
+- ✅ 각 스테이지별 배경음악 자동 재생 (Stage01.mp3 ~ Stage04.mp3)
+- ✅ 탈락 화면 배경음악 (StrageEnd.mp3)
+- ✅ 최종통과 화면 배경음악 (StrageFinal.mp3)
+- ✅ 배경음악 루프 및 음량 관리 (MusicManager)
 - ✅ 모든 기술 요구사항 충족
 - ✅ 반응형 디자인 (모바일/태블릿)
 - ✅ 새로운 게임 규칙: 연속 5정답 또는 3실수로 결정

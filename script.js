@@ -1,3 +1,43 @@
+// ====== 배경음악 관리 ======
+const MusicManager = {
+    currentMusic: null, // 현재 재생 중인 음악
+    
+    playMusic(stageNum, type) {
+        // 기존 음악 중지
+        this.stopMusic();
+        
+        let musicPath = '';
+        
+        if (type === 'quiz') {
+            // 스테이지 1-4 배경음악
+            musicPath = `./assets/Stage${String(stageNum).padStart(2, '0')}.mp3`;
+        } else if (type === 'gameOver') {
+            // 탈락 화면 배경음악
+            musicPath = './assets/StrageEnd.mp3';
+        } else if (type === 'final') {
+            // 최종통과 화면 배경음악
+            musicPath = './assets/StrageFinal.mp3';
+        }
+        
+        if (musicPath) {
+            this.currentMusic = new Audio(musicPath);
+            this.currentMusic.loop = true;
+            this.currentMusic.volume = 0.5; // 볼륨 50%
+            this.currentMusic.play().catch(err => {
+                console.warn('배경음악 재생 실패:', err);
+            });
+        }
+    },
+    
+    stopMusic() {
+        if (this.currentMusic) {
+            this.currentMusic.pause();
+            this.currentMusic.currentTime = 0;
+            this.currentMusic = null;
+        }
+    }
+};
+
 // ====== 게임 상태 관리 ======
 const GameState = {
     quizData: null,
@@ -64,6 +104,9 @@ const GameState = {
 
 // ====== 렌더링 함수 ======
 function renderStartScreen() {
+    // 시작 화면에서 배경음악 중지
+    MusicManager.stopMusic();
+    
     const app = document.getElementById('app');
     app.innerHTML = `
         <img src="./assets/StageStart.png" class="screen-background" alt="Stage Start">
@@ -142,6 +185,7 @@ function renderFinalScreen() {
     `;
     
     document.getElementById('restartBtn').addEventListener('click', () => {
+        MusicManager.stopMusic();
         GameState.reset();
         renderStartScreen();
     });
@@ -162,6 +206,7 @@ function renderGameOverScreen() {
     `;
     
     document.getElementById('retryBtn').addEventListener('click', () => {
+        MusicManager.stopMusic();
         GameState.reset();
         renderStartScreen();
     });
@@ -242,6 +287,15 @@ function checkAnswer(stageNum, questions, selectedAnswer, buttonElement) {
 
 // ====== 비디오 재생 및 전환 ======
 function playVideoAndTransition(stageNum, type) {
+    // 비디오 재생 시작 시점에 배경음악도 함께 시작
+    if (type === 'stageIntro') {
+        MusicManager.playMusic(stageNum, 'quiz');
+    } else if (type === 'stageOut') {
+        MusicManager.playMusic(null, 'gameOver');
+    } else if (type === 'stageFinal') {
+        MusicManager.playMusic(null, 'final');
+    }
+    
     const app = document.getElementById('app');
     let videoPath = '';
     
