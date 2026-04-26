@@ -48,6 +48,8 @@ const GameState = {
     wrongCount: 0, // 틀린 개수 (0-3, 3이면 탈락)
     correctAnswers: 0, // 맞춘 총 문제 수
     wrongAnswers: 0, // 틀린 총 문제 수
+    timer: null,
+    timeRemaining: 10,
     
     reset() {
         this.currentStage = 0;
@@ -57,6 +59,7 @@ const GameState = {
         this.wrongCount = 0;
         this.correctAnswers = 0;
         this.wrongAnswers = 0;
+        this.stopTimer();
     },
     
     startStage(stageNum) {
@@ -82,6 +85,32 @@ const GameState = {
     
     moveToNextQuestion() {
         this.questionIndex++;
+    },
+
+    startTimer(stageNum, callback) {
+        this.stopTimer();
+        this.timeRemaining = 10;
+        const timerBar = document.getElementById('timerBar');
+        if (timerBar) timerBar.style.width = '100%';
+
+        this.timer = setInterval(() => {
+            this.timeRemaining -= 0.1;
+            if (timerBar) {
+                timerBar.style.width = `${(this.timeRemaining / 10) * 100}%`;
+            }
+
+            if (this.timeRemaining <= 0) {
+                this.stopTimer();
+                callback();
+            }
+        }, 100);
+    },
+
+    stopTimer() {
+        if (this.timer) {
+            clearInterval(this.timer);
+            this.timer = null;
+        }
     }
 };
 
@@ -132,6 +161,9 @@ function renderQuizScreen(stageNum) {
                 <div class="status-center circles-container">${correctCircles}</div>
                 <div class="status-right circles-container">${wrongCircles}</div>
             </div>
+            <div class="timer-container">
+                <div class="timer-bar" id="timerBar"></div>
+            </div>
             <div class="progress-info">${progressText}</div>
             <div class="quiz-content">
                 <div class="question-box">
@@ -147,13 +179,33 @@ function renderQuizScreen(stageNum) {
                         `).join('');
                     })()}
                 </div>
+                <div class="hint-container">
+                    <button class="hint-btn" id="hintBtn">💡 힌트보기</button>
+                    <div class="hint-text" id="hintText">${questionData.hint}</div>
+                </div>
             </div>
         </div>
     `;
     
     // 옵션 버튼 이벤트 리스너
     document.querySelectorAll('.option-button').forEach(btn => {
-        btn.addEventListener('click', () => checkAnswer(stageNum, btn.dataset.option, btn));
+        btn.addEventListener('click', () => {
+            GameState.stopTimer();
+            checkAnswer(stageNum, btn.dataset.option, btn);
+        });
+    });
+
+    // 힌트 버튼 이벤트 리스너
+    const hintBtn = document.getElementById('hintBtn');
+    const hintText = document.getElementById('hintText');
+    hintBtn.addEventListener('click', () => {
+        hintText.classList.add('visible');
+        hintBtn.style.display = 'none';
+    });
+
+    // 타이머 시작
+    GameState.startTimer(stageNum, () => {
+        checkAnswer(stageNum, null, null);
     });
 }
 
@@ -201,6 +253,7 @@ function renderGameOverScreen() {
 
 // ====== 게임 로직 ======
 function checkAnswer(stageNum, selectedAnswer, buttonElement) {
+    GameState.stopTimer();
     const stageData = GameState.quizData.movie_quiz_app.stages[stageNum - 1];
     const currentQuestionIndex = GameState.getCurrentQuestion();
     const questionData = stageData.questions[currentQuestionIndex];
@@ -209,7 +262,7 @@ function checkAnswer(stageNum, selectedAnswer, buttonElement) {
     // 모든 버튼 비활성화
     document.querySelectorAll('.option-button').forEach(btn => btn.disabled = true);
     
-    if (isCorrect) {
+    if (isCorrect && buttonElement) {
         // 정답 표시
         buttonElement.classList.add('correct');
         GameState.correctCount++;
@@ -235,8 +288,11 @@ function checkAnswer(stageNum, selectedAnswer, buttonElement) {
             }
         }, 800);
     } else {
-        // 오답 표시
-        buttonElement.classList.add('wrong');
+        // 오답 표시 (또는 시간 초과)
+        if (buttonElement) {
+            buttonElement.classList.add('wrong');
+        }
+        
         GameState.wrongAnswers++;
         GameState.wrongCount++;
         
