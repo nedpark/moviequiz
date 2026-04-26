@@ -40,6 +40,139 @@ const AssetManager = {
     }
 };
 
+// ====== 제스처 관리 (AI 카메라 컨트롤) ======
+const GestureManager = {
+    hands: null,
+    camera: null,
+    isActive: false,
+    currentGesture: null, // 마지막으로 인식된 숫자 (1-4)
+    
+    async init() {
+        if (this.hands) return;
+        
+        const videoElement = document.getElementById('webcam-video');
+        const canvasElement = document.getElementById('webcam-canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const indicator = document.getElementById('gesture-indicator');
+        
+        canvasElement.width = 240;
+        canvasElement.height = 180;
+        
+        this.hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+        
+        this.hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
+        });
+        
+        this.hands.onResults((results) => {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                
+                if (window.drawConnectors && window.drawLandmarks) {
+                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
+                    drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 1, radius: 2});
+                }
+                
+                const fingers = this.countFingers(landmarks);
+                if (fingers >= 1 && fingers <= 4) {
+                    this.currentGesture = fingers;
+                    indicator.innerText = `${fingers}번 선택됨 (시간 종료 시 제출)`;
+                    indicator.classList.add('visible');
+                    this.highlightOption(fingers);
+                } else {
+                    this.currentGesture = null;
+                    indicator.classList.remove('visible');
+                    this.highlightOption(null);
+                }
+            } else {
+                this.currentGesture = null;
+                indicator.classList.remove('visible');
+                this.highlightOption(null);
+            }
+            canvasCtx.restore();
+        });
+        
+        this.camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await this.hands.send({image: videoElement});
+            },
+            width: 240,
+            height: 180
+        });
+    },
+    
+    resetState() {
+        this.currentGesture = null;
+        const indicator = document.getElementById('gesture-indicator');
+        if (indicator) indicator.classList.remove('visible');
+        this.highlightOption(null);
+        
+        // 캔버스 드로잉 초기화
+        const canvasElement = document.getElementById('webcam-canvas');
+        if (canvasElement) {
+            const canvasCtx = canvasElement.getContext('2d');
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        }
+    },
+    
+    async start() {
+        if (window.innerWidth >= 1024) {
+            await this.init();
+            this.resetState();
+            if (!this.isActive) {
+                document.getElementById('webcam-container').classList.add('active');
+                this.camera.start();
+                this.isActive = true;
+            }
+        }
+    },
+    
+    stop() {
+        if (this.isActive) {
+            this.camera.stop();
+            document.getElementById('webcam-container').classList.remove('active');
+            this.isActive = false;
+            this.resetState();
+        }
+    },
+    
+    countFingers(landmarks) {
+        const tips = [8, 12, 16, 20];
+        const pips = [6, 10, 14, 18];
+        let count = 0;
+        
+        for (let i = 0; i < tips.length; i++) {
+            if (landmarks[tips[i]].y < landmarks[pips[i]].y) {
+                count++;
+            }
+        }
+        return count;
+    },
+    
+    highlightOption(index) {
+        const options = document.querySelectorAll('.option-button');
+        options.forEach((btn, idx) => {
+            if (index !== null && idx === index - 1) {
+                btn.style.boxShadow = '0 0 25px #f1c40f';
+                btn.style.border = '2px solid #f1c40f';
+                btn.style.transform = 'scale(1.05)';
+            } else {
+                btn.style.boxShadow = '';
+                btn.style.border = '';
+                btn.style.transform = '';
+            }
+        });
+    }
+};
+
 // ====== 배경음악 관리 ======
 const MusicManager = {
     currentMusic: null, // 현재 재생 중인 음악
@@ -247,14 +380,30 @@ function renderQuizScreen(stageNum) {
 
     // 타이머 시작
     GameState.startTimer(stageNum, () => {
-        checkAnswer(stageNum, null, null);
+        const lastGesture = GestureManager.currentGesture;
+        if (lastGesture) {
+            const buttons = document.querySelectorAll('.option-button');
+            const targetBtn = buttons[lastGesture - 1];
+            if (targetBtn) {
+                checkAnswer(stageNum, targetBtn.dataset.option, targetBtn);
+            } else {
+                checkAnswer(stageNum, null, null);
+            }
+        } else {
+            checkAnswer(stageNum, null, null);
+        }
     });
 
     // 다음 스테이지 에셋 프리로드
     AssetManager.preloadNextStage(stageNum);
+
+    // 제스처 컨트롤 시작 (데스크탑)
+    GestureManager.resetState();
+    GestureManager.start();
 }
 
 function renderFinalScreen() {
+    GestureManager.stop();
     const app = document.getElementById('app');
     app.innerHTML = `
         <img src="./assets/StageFinal.png" class="screen-background" alt="Stage Final">
@@ -276,6 +425,7 @@ function renderFinalScreen() {
 }
 
 function renderGameOverScreen() {
+    GestureManager.stop();
     const app = document.getElementById('app');
     app.innerHTML = `
         <img src="./assets/StageEnd.png" class="screen-background" alt="Stage End">
@@ -298,6 +448,7 @@ function renderGameOverScreen() {
 
 // ====== 게임 로직 ======
 function checkAnswer(stageNum, selectedAnswer, buttonElement) {
+    GestureManager.stop();
     GameState.stopTimer();
     const stageData = GameState.quizData.movie_quiz_app.stages[stageNum - 1];
     const currentQuestionIndex = GameState.getCurrentQuestion();
@@ -305,7 +456,11 @@ function checkAnswer(stageNum, selectedAnswer, buttonElement) {
     const isCorrect = selectedAnswer === questionData.answer;
     
     // 모든 버튼 비활성화
-    document.querySelectorAll('.option-button').forEach(btn => btn.disabled = true);
+    document.querySelectorAll('.option-button').forEach(btn => {
+        btn.disabled = true;
+        btn.style.boxShadow = '';
+        btn.style.transform = '';
+    });
     
     if (isCorrect && buttonElement) {
         // 정답 표시

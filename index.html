@@ -5,9 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>영화 퀴즈 웹앱</title>
     <link rel="stylesheet" href="style.css">
+    <!-- MediaPipe Hands -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 </head>
 <body>
     <div id="app"></div>
+    <!-- Webcam Container for Gesture Control -->
+    <div id="webcam-container" class="webcam-container">
+        <video id="webcam-video" autoplay playsinline></video>
+        <canvas id="webcam-canvas"></canvas>
+        <div id="gesture-indicator" class="gesture-indicator"></div>
+    </div>
     <script src="script.js"></script>
 </body>
 </html>
